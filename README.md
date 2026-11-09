@@ -111,6 +111,6 @@ kasir-soto-warga-bahagia/
 
 ## Tentang
 
-Soto Warga Bahagia adalah warung soto ayam di Villa Pamulang, Jl. Taqwa Blok DF 6 No 7, Pamulang, Tangerang Selatan, dengan janji produk **Soto Ayam Cuman Goceng**. Aplikasi ini dibangun khusus mengikuti alur kerja warung tersebut, mulai dari gerobak, dapur, sampai bagi hasil dua owner.
+Soto Warga Bahagia adalah warung soto ayam, dengan janji produk **Soto Ayam Cuman Goceng**. Aplikasi ini dibangun khusus mengikuti alur kerja warung tersebut, mulai dari gerobak, dapur, sampai bagi hasil dua owner.
 
 ![Logo resmi Soto Warga Bahagia](docs/img/logo-utama.png)
