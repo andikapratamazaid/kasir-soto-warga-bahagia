@@ -810,9 +810,17 @@ function saveMenu(){
   save(); $("nm-name").value=""; $("nm-price").value=""; $("resep-rows").innerHTML=""; addResepRow(); calcHPP();
   toast("Menu "+name+" tersimpan"); renderMenuList(); renderGrid();
 }
+function editPrice(id){
+  const p = DB.products.find(x=>x.id===id); if(!p) return;
+  const v = prompt("Harga jual baru untuk "+p.name+" (Rp):", p.price);
+  if(v===null) return;
+  const np = parseFloat(String(v).replace(/[^0-9]/g,""))||0;
+  if(np<=0){ toast("Harga harus lebih dari 0"); return; }
+  p.price = np; save(); renderMenuList(); renderGrid(); toast("Harga "+p.name+" sekarang "+rp(np));
+}
 function renderMenuList(){
-  $("menu-list").innerHTML = "<table><tr><th>Item</th><th>Kategori</th><th class='r'>Harga</th><th class='r'>HPP</th><th class='r'>Margin</th><th>Status</th></tr>"
-    + DB.products.filter(p=>p.active).map(p=>{ const st=marginStatus(p.price,p.hpp); return "<tr><td>"+esc(p.name)+"</td><td>"+p.cat+"</td><td class='r'>"+rp(p.price)+"</td><td class='r'>"+rp(p.hpp)+"</td><td class='r'>"+(st? st[2].toFixed(0)+"%":"-")+"</td><td>"+(st? '<span class="badge '+st[1]+'">'+st[0]+"</span>":"")+(p.habis? ' <span class="badge b-red">HABIS</span>':"")+"</td></tr>"; }).join("") + "</table>";
+  $("menu-list").innerHTML = "<table><tr><th>Item</th><th>Kategori</th><th class='r'>Harga</th><th class='r'>HPP</th><th class='r'>Margin</th><th>Status</th><th></th></tr>"
+    + DB.products.filter(p=>p.active).map(p=>{ const st=marginStatus(p.price,p.hpp); return "<tr><td>"+esc(p.name)+"</td><td>"+p.cat+"</td><td class='r'>"+rp(p.price)+"</td><td class='r'>"+rp(p.hpp)+"</td><td class='r'>"+(st? st[2].toFixed(0)+"%":"-")+"</td><td>"+(st? '<span class="badge '+st[1]+'">'+st[0]+"</span>":"")+(p.habis? ' <span class="badge b-red">HABIS</span>':"")+"</td><td><button class='mini' onclick=\"editPrice('"+p.id+"')\">Ubah Harga</button></td></tr>"; }).join("") + "</table>";
 }
 /* ============ KARYAWAN ============ */
 function saveEmployee(){
