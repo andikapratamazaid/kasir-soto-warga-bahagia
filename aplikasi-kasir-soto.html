@@ -738,7 +738,9 @@ function renderDashboard(){
   const nol = DB.products.filter(p=>p.active && !sold[p.id]);
   $("dash-attn").innerHTML =
     "<b>Item HABIS saat ini:</b><br>" + (habis.length? habis.map(p=>"• "+esc(p.name)+" (sejak "+(p.habisSejak||"-")+", oleh "+(p.habisOleh||"-")+")").join("<br>") : "Tidak ada.")
-    + "<br><br><b>Item belum terjual hari ini ("+nol.length+"):</b><br>" + (nol.length? nol.slice(0,10).map(p=>"• "+esc(p.name)).join("<br>") + (nol.length>10? "<br>dan lainnya":"") : "Semua item sudah terjual.");
+    + "<br><br><b>Item belum terjual hari ini ("+nol.length+"):</b><br>" + (nol.length? nol.slice(0,10).map(p=>"• "+esc(p.name)).join("<br>") + (nol.length>10? "<br>dan lainnya":"") : "Semua item sudah terjual.")
+    + "<br><br><b>Karyawan masuk hari ini:</b> "+(DB.attendance[t]||[]).length+" dari "+DB.employees.filter(e=>e.active).length+" karyawan"
+    + ((DB.attendance[t]||[]).length? "<br>"+(DB.attendance[t]||[]).map(id=>{ const e=DB.employees.find(x=>x.id===id); return e? "• "+esc(e.name)+" (total masuk "+hadirCount(e.id, null)+" kali)":""; }).join("<br>") : "");
 }
 function kpi(l,v,cls){ return '<div class="kpi"><div class="l">'+l+'</div><div class="v '+cls+'">'+v+"</div></div>"; }
 function wfR(l,v){ return "<tr><td>"+l+'</td><td class="r">'+(v<0? "-"+rp(-v): rp(v))+"</td></tr>"; }
@@ -791,6 +793,13 @@ function saveEmployee(){
   DB.employees.push({id:"e"+Date.now(), name, role:$("ky-role").value.trim()||"-", skema:$("ky-skema").value, tarif, active:true});
   save(); $("ky-name").value=""; $("ky-role").value=""; $("ky-tarif").value=""; toast("Karyawan tersimpan"); renderEmp();
 }
+function hadirCount(id, prefix){
+  return Object.keys(DB.attendance).filter(d=> (!prefix || d.indexOf(prefix)===0) && (DB.attendance[d]||[]).indexOf(id)>=0).length;
+}
+function hadirTerakhir(id){
+  const ds = Object.keys(DB.attendance).filter(d=> (DB.attendance[d]||[]).indexOf(id)>=0).sort();
+  return ds.length? ds[ds.length-1] : null;
+}
 function toggleHadir(id){
   const t = todayStr(); const arr = DB.attendance[t]||(DB.attendance[t]=[]);
   const i = arr.indexOf(id); if(i>=0) arr.splice(i,1); else arr.push(id);
@@ -798,10 +807,14 @@ function toggleHadir(id){
 }
 function renderEmp(){
   const t = todayStr(); const hadir = DB.attendance[t]||[];
-  $("emp-list").innerHTML = "<table><tr><th>Nama</th><th>Jabatan</th><th>Skema</th><th class='r'>Tarif</th><th class='r'>Akrual Hari Ini</th><th>Hadir</th></tr>"
+  const bln = t.slice(0,7);
+  $("emp-list").innerHTML = "<table><tr><th>Nama</th><th>Jabatan</th><th>Skema</th><th class='r'>Tarif</th><th class='r'>Akrual Hari Ini</th><th class='r'>Masuk Bulan Ini</th><th class='r'>Total Masuk</th><th class='r'>Perkiraan Gaji Bulan Ini</th><th>Hadir</th></tr>"
     + DB.employees.filter(e=>e.active).map(e=>{
         const akr = e.skema==="harian"? (hadir.includes(e.id)? e.tarif:0) : Math.round(e.tarif/26);
-        return "<tr><td>"+esc(e.name)+"</td><td>"+esc(e.role)+"</td><td>"+e.skema+"</td><td class='r'>"+rp(e.tarif)+"</td><td class='r'>"+rp(akr)+"</td><td><button class='hbtn' style='"+(hadir.includes(e.id)?"background:var(--grn)":"")+"' onclick='toggleHadir(\""+e.id+"\")'>"+(hadir.includes(e.id)?"✔ Hadir":"Tandai")+"</button></td></tr>"; }).join("") + "</table>";
+        const masukBln = hadirCount(e.id, bln); const masukTot = hadirCount(e.id, null);
+        const gajiBln = e.skema==="harian"? masukBln*e.tarif : e.tarif;
+        const last = hadirTerakhir(e.id);
+        return "<tr><td>"+esc(e.name)+"<br><span style='color:var(--mut);font-size:11.5px'>Terakhir masuk: "+(last? last.split("-").reverse().join("/") : "-")+"</span></td><td>"+esc(e.role)+"</td><td>"+e.skema+"</td><td class='r'>"+rp(e.tarif)+"</td><td class='r'>"+rp(akr)+"</td><td class='r'><b>"+masukBln+" kali</b></td><td class='r'>"+masukTot+" kali</td><td class='r'>"+rp(gajiBln)+"</td><td><button class='hbtn' style='"+(hadir.includes(e.id)?"background:var(--grn)":"")+"' onclick='toggleHadir(\""+e.id+"\")'>"+(hadir.includes(e.id)?"✔ Hadir":"Tandai")+"</button></td></tr>"; }).join("") + "</table>";
   $("emp-accr").textContent = rp(dayFinance(t).gaji);
 }
 /* ============ LAPORAN ============ */
@@ -825,8 +838,8 @@ function dlCSV(kind){
     DB.expenses.filter(e=>e.date===t&&e.kat==="Bahan").map(e=>[e.date,e.time,e.name,e.qty||"",e.uom||"",e.amount,e.oleh])); }
   if(kind==="operasional"){ fname="4-Operasional"; rows=[["Tanggal","Jam","Nama","Total Harga","Oleh"]].concat(
     DB.expenses.filter(e=>e.date===t&&e.kat==="Operasional").map(e=>[e.date,e.time,e.name,e.amount,e.oleh])); }
-  if(kind==="gaji"){ fname="5-Gaji-Karyawan"; const hadir=DB.attendance[t]||[]; rows=[["Nama","Jabatan","Skema","Tarif","Hadir Hari Ini","Akrual Hari Ini"]].concat(
-    DB.employees.filter(e=>e.active).map(e=>[e.name,e.role,e.skema,e.tarif, e.skema==="harian"? (hadir.includes(e.id)?"Ya":"Tidak"):"Akrual harian", e.skema==="harian"? (hadir.includes(e.id)?e.tarif:0):Math.round(e.tarif/26)])); }
+  if(kind==="gaji"){ fname="5-Gaji-Karyawan"; const hadir=DB.attendance[t]||[]; const bln=t.slice(0,7); rows=[["Nama","Jabatan","Skema","Tarif","Hadir Hari Ini","Akrual Hari Ini","Masuk Bulan Ini (kali)","Total Masuk (kali)","Perkiraan Gaji Bulan Ini"]].concat(
+    DB.employees.filter(e=>e.active).map(e=>{ const mb=hadirCount(e.id, bln); return [e.name,e.role,e.skema,e.tarif, e.skema==="harian"? (hadir.includes(e.id)?"Ya":"Tidak"):"Akrual harian", e.skema==="harian"? (hadir.includes(e.id)?e.tarif:0):Math.round(e.tarif/26), mb, hadirCount(e.id, null), e.skema==="harian"? mb*e.tarif : e.tarif]; })); }
   if(kind==="produk"){ fname="6-Produk"; const sold={}; DB.orders.filter(o=>o.date===t&&!o.void).forEach(o=>o.items.forEach(i=>{sold[i.pid]=(sold[i.pid]||0)+i.qty;}));
     rows=[["Produk","Kategori","Harga","HPP Standar","Terjual Hari Ini","Omzet"]].concat(DB.products.filter(p=>p.active).map(p=>[p.name,p.cat,p.price,p.hpp,sold[p.id]||0,(sold[p.id]||0)*p.price])); }
   const csv = rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(",")).join("\n");
