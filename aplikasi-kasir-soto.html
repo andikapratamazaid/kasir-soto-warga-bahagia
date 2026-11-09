@@ -561,7 +561,8 @@ function renderGrid(){
 function addToCart(id){ if(!cart[id]) cart[id]={q:0, pq:0}; cart[id].q++; if(orderType==="takeaway") cart[id].pq=cart[id].q; renderGrid(); renderCart(); }
 function chQty(id,d){ if(!cart[id]) return; cart[id].q+=d; if(cart[id].q<=0){ delete cart[id]; } else { cart[id].pq=Math.min(cart[id].pq||0, cart[id].q); } renderGrid(); renderCart(); }
 function clearCart(){ cart={}; cartPack=false; orderType="dinein"; orderSource="Langsung"; const sr=$("src-ref"); if(sr) sr.value=""; renderGrid(); renderCart(); }
-function packLines(){ return Object.entries(cart).reduce((a,[id,l])=> a + (((prodOf(id)||{}).cat==="Soto")? (l.pq||0):0), 0); } // biaya bungkus dihitung per porsi soto yang dibungkus
+function isNasi(p){ return !!p && (p.name||"").toLowerCase().indexOf("nasi")===0; }
+function packLines(){ return Object.entries(cart).reduce((a,[id,l])=>{ const p=prodOf(id); return a + ((p && p.cat==="Soto" && !isNasi(p))? (l.pq||0):0); }, 0); } // biaya bungkus per porsi soto yang dibungkus, nasi tidak dihitung
 function packFeeTotal(){ return packLines() * (DB.settings.packFee||1000); }
 function setLineType(id, pack){ if(cart[id]){ cart[id].pq = (isOnline() || pack)? cart[id].q:0; renderCart(); } }
 function chPack(id,d){ if(!cart[id]) return; cart[id].pq = isOnline()? cart[id].q : Math.max(0, Math.min(cart[id].q, (cart[id].pq||0)+d)); renderCart(); }
