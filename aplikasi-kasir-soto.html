@@ -810,17 +810,20 @@ function saveMenu(){
   save(); $("nm-name").value=""; $("nm-price").value=""; $("resep-rows").innerHTML=""; addResepRow(); calcHPP();
   toast("Menu "+name+" tersimpan"); renderMenuList(); renderGrid();
 }
-function savePrice(id){
+function saveRow(id){
   const p = DB.products.find(x=>x.id===id); if(!p) return;
-  const el = $("pr-"+id); if(!el) return;
-  const np = parseFloat(String(el.value).replace(/[^0-9]/g,""))||0;
-  if(np<=0){ toast("Harga harus lebih dari 0"); el.value = p.price; return; }
-  if(np===p.price){ toast("Harga "+p.name+" tidak berubah"); return; }
-  p.price = np; save(); renderMenuList(); renderGrid(); toast("Harga "+p.name+" sekarang "+rp(np));
+  const ep = $("pr-"+id), eh = $("hp-"+id); if(!ep || !eh) return;
+  const np = parseFloat(String(ep.value).replace(/[^0-9]/g,""))||0;
+  const nh = parseFloat(String(eh.value).replace(/[^0-9]/g,""))||0;
+  if(np<=0){ toast("Harga harus lebih dari 0"); ep.value = p.price; return; }
+  if(nh<0){ toast("HPP tidak boleh negatif"); eh.value = p.hpp; return; }
+  if(np===p.price && nh===p.hpp){ toast("Harga dan HPP "+p.name+" tidak berubah"); return; }
+  p.price = np; p.hpp = nh; save(); renderMenuList(); renderGrid();
+  toast(p.name+" diperbarui: harga "+rp(np)+", HPP "+rp(nh));
 }
 function renderMenuList(){
-  $("menu-list").innerHTML = "<p style='font-size:12.5px;color:var(--mut);margin:0 0 8px'>Harga dapat diubah langsung: ketik harga baru pada kolom Harga, lalu klik Simpan pada barisnya. Harga baru berlaku untuk transaksi berikutnya.</p><div style='overflow-x:auto'><table><tr><th>Item</th><th>Kategori</th><th class='r'>Harga (Rp)</th><th class='r'>HPP</th><th class='r'>Margin</th><th>Status</th><th></th></tr>"
-    + DB.products.filter(p=>p.active).map(p=>{ const st=marginStatus(p.price,p.hpp); return "<tr><td>"+esc(p.name)+"</td><td>"+p.cat+"</td><td class='r'><input type='number' id='pr-"+p.id+"' value='"+p.price+"' style='width:100px;text-align:right'></td><td class='r'>"+rp(p.hpp)+"</td><td class='r'>"+(st? st[2].toFixed(0)+"%":"-")+"</td><td>"+(st? '<span class="badge '+st[1]+'">'+st[0]+"</span>":"")+(p.habis? ' <span class="badge b-red">HABIS</span>':"")+"</td><td><button class='mini' onclick=\"savePrice('"+p.id+"')\">Simpan</button></td></tr>"; }).join("") + "</table></div>";
+  $("menu-list").innerHTML = "<p style='font-size:12.5px;color:var(--mut);margin:0 0 8px'>Harga dan HPP dapat diubah langsung: ketik nilai baru pada kolom Harga atau HPP, lalu klik Simpan pada barisnya. Margin terhitung ulang otomatis dan nilai baru berlaku untuk transaksi berikutnya.</p><div style='overflow-x:auto'><table><tr><th>Item</th><th>Kategori</th><th class='r'>Harga (Rp)</th><th class='r'>HPP (Rp)</th><th class='r'>Margin</th><th>Status</th><th></th></tr>"
+    + DB.products.filter(p=>p.active).map(p=>{ const st=marginStatus(p.price,p.hpp); return "<tr><td>"+esc(p.name)+"</td><td>"+p.cat+"</td><td class='r'><input type='number' id='pr-"+p.id+"' value='"+p.price+"' style='width:100px;text-align:right'></td><td class='r'><input type='number' id='hp-"+p.id+"' value='"+p.hpp+"' style='width:100px;text-align:right'></td><td class='r'>"+(st? st[2].toFixed(0)+"%":"-")+"</td><td>"+(st? '<span class="badge '+st[1]+'">'+st[0]+"</span>":"")+(p.habis? ' <span class="badge b-red">HABIS</span>':"")+"</td><td><button class='mini' onclick=\"saveRow('"+p.id+"')\">Simpan</button></td></tr>"; }).join("") + "</table></div>";
 }
 /* ============ KARYAWAN ============ */
 function saveEmployee(){
