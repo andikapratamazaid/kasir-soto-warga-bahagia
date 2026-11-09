@@ -67,9 +67,9 @@ Di HP, buka tautan di atas lalu pilih menu browser **Tambahkan ke Layar Utama** 
 1. Setiap kasir menutup shiftnya dan mencocokkan uang fisik.
 2. Setelah shift terakhir tutup, rekap harian berstatus Final dan dashboard owner menampilkan laba bersih, tabungan, serta bagian masing-masing owner.
 
-## Flowchart Alur Aplikasi
+## User Flow Aplikasi
 
-![Flowchart alur aplikasi kasir Soto Warga Bahagia](docs/img/flowchart.png)
+![User flow aplikasi kasir Soto Warga Bahagia](docs/img/user-flow.png)
 
 ## Teknologi
 
@@ -89,7 +89,7 @@ kasir-soto-warga-bahagia/
     img/
       banner.png             Banner utama repository
       visual-desain.png      Visual desain tiga layar utama
-      flowchart.png          Flowchart alur aplikasi dari login sampai laporan
+      user-flow.png          User flow perjalanan layar kasir dan owner, dari login sampai selesai
       logo-utama.png         Logo resmi versi horizontal
 ```
 
