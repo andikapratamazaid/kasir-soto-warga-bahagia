@@ -329,7 +329,7 @@ td.r,th.r{text-align:right}
         <div class="fgrid">
           <div class="frow"><label>Tabungan warung (% omzet)</label><input id="set-tab" type="number"></div>
           <div class="frow"><label>Bagian Owner 1 (%)</label><input id="set-o1" type="number"></div>
-          <div class="frow"><label>Biaya bungkus per jenis soto yang dibungkus (Rp)</label><input id="set-pack" type="number"></div>
+          <div class="frow"><label>Biaya bungkus per porsi soto yang dibungkus (Rp)</label><input id="set-pack" type="number"></div>
         </div>
         <button class="btn brown" onclick="saveSettings()">Simpan Pengaturan</button>
         <button class="btn red" style="margin-top:14px" onclick="resetDemo()">Reset Semua Data Demo</button>
@@ -538,7 +538,7 @@ function renderGrid(){
 function addToCart(id){ if(!cart[id]) cart[id]={q:0, pq:0}; cart[id].q++; if(orderType==="takeaway") cart[id].pq=cart[id].q; renderGrid(); renderCart(); }
 function chQty(id,d){ if(!cart[id]) return; cart[id].q+=d; if(cart[id].q<=0){ delete cart[id]; } else { cart[id].pq=Math.min(cart[id].pq||0, cart[id].q); } renderGrid(); renderCart(); }
 function clearCart(){ cart={}; cartPack=false; orderType="dinein"; orderSource="Langsung"; const sr=$("src-ref"); if(sr) sr.value=""; renderGrid(); renderCart(); }
-function packLines(){ return Object.entries(cart).filter(([id,l])=> (l.pq||0)>0 && ((DB.products.find(p=>p.id===id)||{}).cat==="Soto")).length; } // biaya bungkus hanya dihitung untuk item kategori Soto
+function packLines(){ return Object.entries(cart).reduce((a,[id,l])=> a + (((DB.products.find(p=>p.id===id)||{}).cat==="Soto")? (l.pq||0):0), 0); } // biaya bungkus dihitung per porsi soto yang dibungkus
 function packFeeTotal(){ return packLines() * (DB.settings.packFee||1000); }
 function setLineType(id, pack){ if(cart[id]){ cart[id].pq = (isOnline() || pack)? cart[id].q:0; renderCart(); } }
 function chPack(id,d){ if(!cart[id]) return; cart[id].pq = isOnline()? cart[id].q : Math.max(0, Math.min(cart[id].q, (cart[id].pq||0)+d)); renderCart(); }
