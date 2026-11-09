@@ -87,7 +87,7 @@ td.r,th.r{text-align:right}
 .wf td{font-size:14px}
 .wf .tot td{font-weight:800;color:var(--brown);border-top:2px solid var(--brown);font-size:15px}
 .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800}
-.b-grn{background:#E8F5E9;color:var(--grn)}.b-red{background:#FFEBEE;color:var(--red)}.b-amb{background:#FFF3E0;color:#E65100}.b-gry{background:#EEE;color:#616161}
+.b-grn{background:#E8F5E9;color:var(--grn)}.b-grab{background:#E6F4EA;color:#137333}.b-red{background:#FFEBEE;color:var(--red)}.b-amb{background:#FFF3E0;color:#E65100}.b-gry{background:#EEE;color:#616161}
 .bar-row{display:flex;align-items:center;gap:8px;font-size:12px;margin:4px 0}
 .bar-row .d{width:74px;color:var(--mut)}
 .bar-row .tr{flex:1;background:#F5EFE2;border-radius:6px;height:18px;overflow:hidden}
@@ -105,6 +105,7 @@ td.r,th.r{text-align:right}
 .seg button{padding:14px;border-radius:12px;font-size:15px;font-weight:800;background:#fff;border:2.5px solid var(--line);color:var(--brown)}
 .seg button.on[data-k="Bahan"]{background:#FFF3D6;border-color:var(--amber)}
 .seg button.on[data-k="Operasional"]{background:#E3F2FD;border-color:#1565C0}
+.seg button.on[data-src]{background:var(--brown);color:#fff;border-color:var(--brown)}
 /* Modal */
 .modal{position:fixed;inset:0;background:rgba(30,20,10,.55);display:flex;align-items:flex-end;justify-content:center;z-index:100}
 @media(min-width:700px){.modal{align-items:center}}
@@ -169,13 +170,21 @@ td.r,th.r{text-align:right}
         </div>
         <div class="cart">
           <h3>Pesanan <span id="cart-shift" style="color:var(--mut);font-weight:600"></span></h3>
+          <div style="font-size:12.5px;font-weight:700;color:var(--brown2);margin-bottom:6px">Sumber pesanan</div>
+          <div class="seg" id="src-seg" style="margin-bottom:8px">
+            <button data-src="Langsung" onclick="setOrderSource('Langsung')">🏪 Langsung</button>
+            <button data-src="ShopeeFood" onclick="setOrderSource('ShopeeFood')">🟠 ShopeeFood</button>
+            <button data-src="GoFood" onclick="setOrderSource('GoFood')">🟢 GoFood</button>
+            <button data-src="GrabFood" onclick="setOrderSource('GrabFood')">🟩 GrabFood</button>
+          </div>
+          <div class="frow hidden" id="src-ref-row" style="margin-bottom:8px"><label>Kode pesanan platform</label><input id="src-ref" placeholder="Kode dari aplikasi platform (opsional)"></div>
           <div id="cart-lines"><div class="empty">Belum ada item. Ketuk menu untuk menambah.</div></div>
           <div class="ctot"><span>Total</span><span id="cart-total">Rp0</span></div>
           <div class="seg" style="margin-top:8px">
             <button id="type-dinein" onclick="setOrderType('dinein')">🍽️ Semua di Sini</button>
             <button id="type-takeaway" onclick="setOrderType('takeaway')">🛍️ Semua Dibungkus</button>
           </div>
-          <div class="payrow">
+          <div class="payrow" id="payrow">
             <button class="btn-tunai" onclick="openPay('Tunai')">💵 TUNAI</button>
             <button class="btn-qris" onclick="openPay('QRIS')">📱 QRIS</button>
           </div>
@@ -236,6 +245,11 @@ td.r,th.r{text-align:right}
       <div class="card">
         <h3>Omzet 7 Hari Terakhir</h3>
         <div id="dash-chart"></div>
+      </div>
+      <div class="card">
+        <h3>Trafik Sumber Pesanan Hari Ini</h3>
+        <div id="dash-channel"></div>
+        <p style="font-size:12.5px;color:var(--mut);margin-top:8px">Omzet platform adalah nilai pesanan yang tercatat di kasir, sebelum potongan komisi masing-masing platform.</p>
       </div>
       <div class="fgrid">
         <div class="card"><h3>Produk Terlaris Hari Ini</h3><div id="dash-top"></div></div>
@@ -388,7 +402,7 @@ function save(){ localStorage.setItem(KEY, JSON.stringify(DB)); }
 
 /* ============ STATE UI ============ */
 let role = null, pinBuf = "", pinRole = "kasir";
-let cart = {}; let cartPack = false; let orderType = "dinein"; let curCat = "Semua"; let expKat = null; let payMethod = null, payGiven = 0;
+let cart = {}; let cartPack = false; let orderType = "dinein"; let orderSource = "Langsung"; const ONLINE_SOURCES = ["ShopeeFood","GoFood","GrabFood"]; let curCat = "Semua"; let expKat = null; let payMethod = null, payGiven = 0;
 const $ = id => document.getElementById(id);
 const rp = n => "Rp" + Math.round(n).toLocaleString("id-ID");
 function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2400); }
@@ -455,6 +469,7 @@ function openCloseShift(){
     + '<table class="wf"><tr><td>Transaksi</td><td class="r">'+o.count+' ('+o.countQ+' QRIS)</td></tr>'
     + '<tr><td>Penjualan tunai</td><td class="r">'+rp(o.tunai)+'</td></tr>'
     + '<tr><td>Penjualan QRIS</td><td class="r">'+rp(o.qris)+'</td></tr>'
+    + '<tr><td>Penjualan online (ShopeeFood, GoFood, GrabFood)</td><td class="r">'+rp(o.online)+' ('+o.countOn+' order, tidak masuk laci)</td></tr>'
     + '<tr><td>Modal awal</td><td class="r">'+rp(s.modal)+'</td></tr>'
     + '<tr><td>Pengeluaran dari laci (shift ini)</td><td class="r">-'+rp(o.exp)+'</td></tr>'
     + '<tr class="tot"><td>Kas seharusnya di laci</td><td class="r">'+rp(o.expected)+'</td></tr></table>'
@@ -465,8 +480,9 @@ function shiftTotals(s){
   const os = DB.orders.filter(o=>o.shiftId===s.id && !o.void);
   const tunai = os.filter(o=>o.method==="Tunai").reduce((a,o)=>a+o.total,0);
   const qris = os.filter(o=>o.method==="QRIS").reduce((a,o)=>a+o.total,0);
+  const online = os.filter(o=>ONLINE_SOURCES.indexOf(orderSourceOf(o))>=0).reduce((a,o)=>a+o.total,0);
   const exp = DB.expenses.filter(e=>e.shiftId===s.id).reduce((a,e)=>a+e.amount,0);
-  return {count: os.filter(o=>o.method==="Tunai").length, countQ: os.filter(o=>o.method==="QRIS").length, tunai, qris, exp, expected: s.modal + tunai - exp};
+  return {count: os.filter(o=>o.method==="Tunai").length, countQ: os.filter(o=>o.method==="QRIS").length, tunai, qris, online, countOn: os.filter(o=>ONLINE_SOURCES.indexOf(orderSourceOf(o))>=0).length, exp, expected: s.modal + tunai - exp};
 }
 function doCloseShift(id){
   const s = DB.shifts.find(x=>x.id===id); const fisik = parseFloat($("cs-fisik").value);
@@ -498,13 +514,16 @@ function renderGrid(){
 }
 function addToCart(id){ if(!cart[id]) cart[id]={q:0, pq:0}; cart[id].q++; if(orderType==="takeaway") cart[id].pq=cart[id].q; renderGrid(); renderCart(); }
 function chQty(id,d){ if(!cart[id]) return; cart[id].q+=d; if(cart[id].q<=0){ delete cart[id]; } else { cart[id].pq=Math.min(cart[id].pq||0, cart[id].q); } renderGrid(); renderCart(); }
-function clearCart(){ cart={}; cartPack=false; orderType="dinein"; renderGrid(); renderCart(); }
+function clearCart(){ cart={}; cartPack=false; orderType="dinein"; orderSource="Langsung"; const sr=$("src-ref"); if(sr) sr.value=""; renderGrid(); renderCart(); }
 function packLines(){ return Object.values(cart).filter(l=>(l.pq||0)>0).length; }
 function packFeeTotal(){ return packLines() * (DB.settings.packFee||1000); }
-function setLineType(id, pack){ if(cart[id]){ cart[id].pq = pack? cart[id].q:0; renderCart(); } }
-function chPack(id,d){ if(!cart[id]) return; cart[id].pq = Math.max(0, Math.min(cart[id].q, (cart[id].pq||0)+d)); renderCart(); }
+function setLineType(id, pack){ if(cart[id]){ cart[id].pq = (isOnline() || pack)? cart[id].q:0; renderCart(); } }
+function chPack(id,d){ if(!cart[id]) return; cart[id].pq = isOnline()? cart[id].q : Math.max(0, Math.min(cart[id].q, (cart[id].pq||0)+d)); renderCart(); }
 function cartTotal(){ const base = Object.entries(cart).reduce((a,[id,l])=>{ const p=DB.products.find(x=>x.id===id); return a+(p?p.price*l.q:0); },0); return base + packFeeTotal(); }
-function setOrderType(t){ orderType=t; Object.values(cart).forEach(l=>{ l.pq = (t==="takeaway")? l.q:0; }); renderCart(); }
+function setOrderType(t){ if(isOnline()) t="takeaway"; orderType=t; Object.values(cart).forEach(l=>{ l.pq = (t==="takeaway")? l.q:0; }); renderCart(); }
+function isOnline(){ return ONLINE_SOURCES.indexOf(orderSource)>=0; }
+function orderSourceOf(o){ return o.sumber || (ONLINE_SOURCES.indexOf(o.method)>=0? o.method : "Langsung"); }
+function setOrderSource(s){ orderSource=s; if(isOnline()){ orderType="takeaway"; Object.values(cart).forEach(l=>{ l.pq=l.q; }); } renderCart(); }
 function renderCart(){
   const s = myOpenShift();
   $("cart-shift").textContent = s ? "• Shift "+s.no : "• belum ada shift";
@@ -523,6 +542,9 @@ function renderCart(){
   if(td && tt){ const din = orderType==="dinein";
     td.style.background = din? "var(--brown)":"#fff"; td.style.color = din? "#fff":"var(--brown)"; td.style.borderColor = din? "var(--brown)":"var(--line)";
     tt.style.background = !din? "var(--amber)":"#fff"; tt.style.color = !din? "#fff":"var(--brown)"; tt.style.borderColor = !din? "var(--amber)":"var(--line)"; }
+  [...document.querySelectorAll("#src-seg button")].forEach(b=>b.classList.toggle("on", b.dataset.src===orderSource));
+  const rr = $("src-ref-row"); if(rr) rr.classList.toggle("hidden", !isOnline());
+  const pr = $("payrow"); if(pr) pr.innerHTML = isOnline()? '<button class="btn grn" style="grid-column:1/-1" onclick="openPay(\''+orderSource+'\')">✔ LUNAS VIA '+esc(orderSource.toUpperCase())+'</button>' : '<button class="btn-tunai" onclick="openPay(\'Tunai\')">💵 TUNAI</button><button class="btn-qris" onclick="openPay(\'QRIS\')">📱 QRIS</button>';
 }
 function renderShiftBar(){
   const s = myOpenShift(); const t = todayStr();
@@ -546,8 +568,10 @@ function openPay(method){
     inner += '<div class="quick">'+[5000,10000,20000,50000,100000].map(n=>'<button onclick="setGiven('+n+')">'+rp(n)+"</button>").join("")+'<button onclick="setGiven('+tot+')">Uang Pas</button></div>'
       + '<div class="frow"><label>Uang diterima (Rp)</label><input id="pay-in" type="number" oninput="payGiven=parseFloat(this.value)||0;drawKembali()"></div>'
       + '<div style="font-size:16px;margin:8px 0">Kembali: <b id="pay-kembali">Rp0</b></div>';
-  } else {
+  } else if(method==="QRIS") {
     inner += '<p style="font-size:14px;margin-bottom:10px">Pembeli memindai kode QRIS warung. Tekan Lunas setelah pembayaran terkonfirmasi di aplikasi QRIS.</p>';
+  } else {
+    inner += '<p style="font-size:14px;margin-bottom:10px">Pesanan dari <b>'+esc(method)+'</b> dibayar pembeli di aplikasi platform. Periksa status pesanan di aplikasi '+esc(method)+', lalu tekan Lunas untuk mencatat penjualan dan mencetak tiket dapur.</p>';
   }
   inner += '<button class="btn grn" onclick="finishPay()">✔ LUNAS dan Cetak Struk</button>';
   modal(inner);
@@ -563,26 +587,29 @@ function finishPay(){
   const items = Object.entries(cart).map(([id,l])=>{ const p=DB.products.find(x=>x.id===id); return {pid:id, name:p.name, price:p.price, hpp:p.hpp, qty:l.q, pq:l.pq||0, pack:(l.pq||0)>0}; });
   const _ls = Object.values(cart); const _pk = _ls.reduce((a,l)=>a+(l.pq||0),0); const _tot = _ls.reduce((a,l)=>a+l.q,0);
   const _tipe = _pk===0? "Makan di Sini" : _pk>=_tot? "Dibungkus" : "Campuran";
+  const _online = ONLINE_SOURCES.indexOf(payMethod)>=0;
+  const _srcRef = _online? ((($("src-ref") && $("src-ref").value) || "").trim() || null) : null;
   const order = {id:"o"+Date.now(), date:t, time:new Date().toTimeString().slice(0,5), qno, shiftId:s.id, shiftNo:s.no,
                  oleh:role, items, total:tot, method:payMethod, given: payMethod==="Tunai"?payGiven:tot,
-                 change: payMethod==="Tunai"? payGiven-tot : 0, tipe: _tipe, bungkus: _pk>0, packFee: packFeeTotal(), ref: payMethod==="QRIS"? "QRIS-"+Math.random().toString(36).slice(2,8).toUpperCase():null, void:false, voidReason:null};
-  DB.orders.push(order); save(); cart={}; cartPack=false; orderType="dinein"; closeModal(); renderAll(); showReceipt(order);
+                 change: payMethod==="Tunai"? payGiven-tot : 0, tipe: _tipe, bungkus: _pk>0, packFee: packFeeTotal(), sumber: _online? payMethod : "Langsung", platformRef: _srcRef, ref: payMethod==="QRIS"? "QRIS-"+Math.random().toString(36).slice(2,8).toUpperCase():null, void:false, voidReason:null};
+  DB.orders.push(order); save(); cart={}; cartPack=false; orderType="dinein"; orderSource="Langsung"; const _sr=$("src-ref"); if(_sr) _sr.value=""; closeModal(); renderAll(); showReceipt(order);
 }
 function receiptHTML(o){
   const rows = o.items.map(it=>'<tr><td colspan="2">'+esc(it.name)+(((it.pq||0)>0)? ((it.pq>=it.qty)? " (BUNGKUS)":" (BUNGKUS "+it.pq+")") : (it.pack? " (BUNGKUS)":""))+'</td></tr><tr><td>&nbsp;&nbsp;'+it.qty+" x "+rp(it.price).replace("Rp","")+'</td><td style="text-align:right">'+rp(it.qty*it.price).replace("Rp","")+"</td></tr>").join("");
   return '<div class="struk"><div class="c"><img src="'+LOGO_STRUK+'" alt="Logo Soto Warga Bahagia" style="width:235px;max-width:100%"></div>'
     + '<div class="c" style="margin-top:4px">'+esc(DB.settings.addr)+"</div><hr>"
     + '<div class="c" style="font-size:12px">NOMOR ANTRIAN</div><div class="qnum">'+String(o.qno).padStart(3,"0")+"</div><hr>"
-    + '<table style="width:100%"><tr><td>'+o.date.split("-").reverse().join("/")+" "+o.time+'</td><td style="text-align:right">Kasir: '+(o.oleh==="owner"?"Owner":"Kasir")+'</td></tr><tr><td>Shift '+o.shiftNo+'</td><td style="text-align:right">'+o.method+(o.ref?" "+o.ref:"")+"</td></tr>"+'<tr><td>Tipe</td><td style="text-align:right">'+(o.tipe || (o.bungkus? "Dibungkus":"Makan di Sini"))+"</td></tr></table><hr>"
+    + '<table style="width:100%"><tr><td>'+o.date.split("-").reverse().join("/")+" "+o.time+'</td><td style="text-align:right">Kasir: '+(o.oleh==="owner"?"Owner":"Kasir")+'</td></tr><tr><td>Shift '+o.shiftNo+'</td><td style="text-align:right">'+o.method+(o.ref?" "+o.ref:"")+"</td></tr>"+'<tr><td>Tipe</td><td style="text-align:right">'+(o.tipe || (o.bungkus? "Dibungkus":"Makan di Sini"))+"</td></tr>"+'<tr><td>Sumber</td><td style="text-align:right">'+esc(orderSourceOf(o))+(o.platformRef? " • "+esc(o.platformRef):"")+"</td></tr></table><hr>"
     + '<table style="width:100%">'+rows+(o.packFee? '<tr><td>Biaya bungkus (plastik)</td><td style="text-align:right">'+rp(o.packFee).replace("Rp","")+"</td></tr>":"")+"</table><hr>"
     + '<table style="width:100%"><tr><td><b>TOTAL</b></td><td style="text-align:right"><b>'+rp(o.total)+'</b></td></tr>'
     + (o.method==="Tunai"
         ? '<tr><td>Bayar (Tunai)</td><td style="text-align:right">'+rp(o.given)+'</td></tr><tr><td>Kembali</td><td style="text-align:right">'+rp(o.change)+"</td></tr>"
-        : '<tr><td colspan="2">LUNAS QRIS</td></tr>')
+        : '<tr><td colspan="2">'+(o.method==="QRIS"? "LUNAS QRIS" : "LUNAS VIA "+esc(orderSourceOf(o).toUpperCase()))+"</td></tr>")
     + "</table><hr>"
     + '<div class="c">'+esc(DB.settings.foot)+'</div><div class="c" style="font-weight:bold;margin-top:2px">'+esc(DB.settings.tagline)+"</div></div>"
     + '<div class="tiket"><div class="c" style="font-weight:800;letter-spacing:1px">TIKET DAPUR</div><div class="qnum">'+String(o.qno).padStart(3,"0")+'</div><div class="c" style="color:#444">'+o.time+" • Shift "+o.shiftNo+'</div><hr style="border-top:2px solid #000;margin:8px 0">'
     + '<div class="c" style="font-weight:800;font-size:17px;margin:5px 0">'+(o.tipe==="Campuran"? "*** SEBAGIAN DIBUNGKUS ***" : o.bungkus? "*** DIBUNGKUS ***":"MAKAN DI SINI")+"</div>"
+    + (ONLINE_SOURCES.indexOf(orderSourceOf(o))>=0? '<div class="c" style="font-weight:800;font-size:19px;margin:4px 0">*** '+esc(orderSourceOf(o).toUpperCase())+' ***</div>'+(o.platformRef? '<div class="c" style="font-size:13px">Kode: '+esc(o.platformRef)+"</div>":"") : "")
     + o.items.map(it=>'<div class="it">'+it.qty+"x&nbsp; "+esc(it.name)+(((it.pq||0)>0)? ((it.pq>=it.qty)? " (BUNGKUS)":" (BUNGKUS "+it.pq+", DI SINI "+(it.qty-it.pq)+")") : (it.pack? " (BUNGKUS)":""))+"</div>").join("")+"</div>";
 }
 function showReceipt(o){
@@ -598,7 +625,7 @@ function printReceipt(id){
 /* ============ PENGELUARAN ============ */
 function pickKat(k){
   expKat = k;
-  [...document.querySelectorAll(".seg button")].forEach(b=>b.classList.toggle("on", b.dataset.k===k));
+  [...document.querySelectorAll(".seg button[data-k]")].forEach(b=>b.classList.toggle("on", b.dataset.k===k));
   $("exp-form").classList.remove("hidden"); $("exp-hint").classList.add("hidden");
   $("exp-bahan").classList.toggle("hidden", k!=="Bahan");
   $("exp-nama").classList.toggle("hidden", k==="Bahan");
@@ -634,7 +661,7 @@ function renderHistory(){
   const t = todayStr();
   const list = DB.orders.filter(o=>o.date===t).slice().reverse();
   $("hist-list").innerHTML = list.length? "<table><tr><th>Antrian</th><th>Jam</th><th>Item</th><th>Bayar</th><th class='r'>Total</th><th></th></tr>"
-    + list.map(o=>"<tr"+(o.void?' style="opacity:.5;text-decoration:line-through"':"")+"><td><b>"+String(o.qno).padStart(3,"0")+"</b></td><td>"+o.time+"</td><td>"+o.items.map(i=>i.qty+"x "+esc(i.name)).join(", ")+"</td><td>"+o.method+(o.tipe==="Campuran"? ' <span class="badge b-amb">Campuran</span>' : o.bungkus? ' <span class="badge b-amb">Bungkus</span>' : ' <span class="badge b-grn">Di Sini</span>')+"</td><td class='r'>"+rp(o.total)+"</td><td>"
+    + list.map(o=>"<tr"+(o.void?' style="opacity:.5;text-decoration:line-through"':"")+"><td><b>"+String(o.qno).padStart(3,"0")+"</b></td><td>"+o.time+"</td><td>"+o.items.map(i=>i.qty+"x "+esc(i.name)).join(", ")+"</td><td>"+o.method+(o.tipe==="Campuran"? ' <span class="badge b-amb">Campuran</span>' : o.bungkus? ' <span class="badge b-amb">Bungkus</span>' : ' <span class="badge b-grn">Di Sini</span>')+(o.platformRef? ' <span class="badge b-gry">'+esc(o.platformRef)+"</span>":"")+"</td><td class='r'>"+rp(o.total)+"</td><td>"
       + (o.void? "<span class='badge b-red'>VOID</span>" : '<button class="hbtn" onclick="showReceipt(DB.orders.find(x=>x.id===\''+o.id+'\'))">Struk</button> <button class="hbtn" style="background:var(--red)" onclick="voidOrder(\''+o.id+'\')">Void</button>')
       + "</td></tr>").join("") + "</table>"
     : '<div class="empty">Belum ada transaksi hari ini.</div>';
@@ -692,6 +719,11 @@ function renderDashboard(){
     + '<tr class="tot"><td>Sisa dibagi owner</td><td class="r">'+rp(f.sisa)+"</td></tr>"
     + wfR("Owner 1 ("+DB.settings.o1Pct+"%)", f.o1) + wfR("Owner 2 ("+(100-DB.settings.o1Pct)+"%)", f.o2)
     + '<tr><td style="color:var(--mut)">Pembanding: HPP standar bila dihitung per porsi</td><td class="r" style="color:var(--mut)">'+rp(f.hppStd)+"</td></tr>";
+  const chNames = ["Langsung","ShopeeFood","GoFood","GrabFood"];
+  const ch = {}; chNames.forEach(n=>{ ch[n]={n:0, om:0}; });
+  DB.orders.filter(o=>o.date===t && !o.void).forEach(o=>{ const s2 = orderSourceOf(o); const k = ch[s2]? s2 : "Langsung"; ch[k].n++; ch[k].om += o.total; });
+  const chMax = Math.max(1, Math.max.apply(null, chNames.map(n=>ch[n].om)));
+  $("dash-channel").innerHTML = chNames.map(n=>'<div class="bar-row"><div class="d" style="width:110px">'+n+'</div><div class="tr"><div class="fl" style="width:'+Math.round(ch[n].om/chMax*100)+'%"></div></div><div class="val">'+rp(ch[n].om)+" • "+ch[n].n+" order</div></div>").join("");
   // chart 7 hari
   let bars = "", max = 1; const days = [];
   for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const ds=todayStr(d); const om=dayFinance(ds).omzet; days.push([ds,om]); if(om>max)max=om; }
@@ -782,9 +814,13 @@ function renderTraffic(){
 }
 function dlCSV(kind){
   const t = todayStr(); const f = dayFinance(t); let rows = [], fname = "";
-  if(kind==="ringkasan"){ fname="1-Ringkasan"; rows=[["Tanggal",t],["Omzet",f.omzet],["Biaya Bahan Aktual",f.bahan],["Biaya Operasional",f.ops],["Beban Gaji Akrual",f.gaji],["Laba Bersih",f.laba],["Tabungan Warung",f.tab],["Sisa Dibagi",f.sisa],["Owner 1",f.o1],["Owner 2",f.o2],["Jumlah Transaksi",f.count]]; }
-  if(kind==="penjualan"){ fname="2-Penjualan"; rows=[["Antrian","Tanggal","Jam","Shift","Item","Qty","Harga","Subtotal","Metode","Tipe","Status"]].concat(
-    DB.orders.filter(o=>o.date===t).flatMap(o=>o.items.map(i=>[o.qno,o.date,o.time,o.shiftNo,i.name,i.qty,i.price,i.price*i.qty,o.method,(((i.pq||0)===0)? "Di Sini" : ((i.pq>=i.qty)? "Bungkus" : "Campuran")),o.void?"VOID":"OK"]))); }
+  if(kind==="ringkasan"){ fname="1-Ringkasan"; rows=[["Tanggal",t],["Omzet",f.omzet],["Biaya Bahan Aktual",f.bahan],["Biaya Operasional",f.ops],["Beban Gaji Akrual",f.gaji],["Laba Bersih",f.laba],["Tabungan Warung",f.tab],["Sisa Dibagi",f.sisa],["Owner 1",f.o1],["Owner 2",f.o2],["Jumlah Transaksi",f.count],
+    ["Omzet Langsung", DB.orders.filter(o=>o.date===t&&!o.void).filter(o=>orderSourceOf(o)==="Langsung").reduce((a,o)=>a+o.total,0)],
+    ["Omzet ShopeeFood", DB.orders.filter(o=>o.date===t&&!o.void).filter(o=>orderSourceOf(o)==="ShopeeFood").reduce((a,o)=>a+o.total,0)],
+    ["Omzet GoFood", DB.orders.filter(o=>o.date===t&&!o.void).filter(o=>orderSourceOf(o)==="GoFood").reduce((a,o)=>a+o.total,0)],
+    ["Omzet GrabFood", DB.orders.filter(o=>o.date===t&&!o.void).filter(o=>orderSourceOf(o)==="GrabFood").reduce((a,o)=>a+o.total,0)]]; }
+  if(kind==="penjualan"){ fname="2-Penjualan"; rows=[["Antrian","Tanggal","Jam","Shift","Item","Qty","Harga","Subtotal","Metode","Sumber","Kode Platform","Tipe","Status"]].concat(
+    DB.orders.filter(o=>o.date===t).flatMap(o=>o.items.map(i=>[o.qno,o.date,o.time,o.shiftNo,i.name,i.qty,i.price,i.price*i.qty,o.method,orderSourceOf(o),o.platformRef||"",(((i.pq||0)===0)? "Di Sini" : ((i.pq>=i.qty)? "Bungkus" : "Campuran")),o.void?"VOID":"OK"]))); }
   if(kind==="bahan"){ fname="3-Bahan-bahan"; rows=[["Tanggal","Jam","Bahan","Qty","Satuan","Total Harga","Oleh"]].concat(
     DB.expenses.filter(e=>e.date===t&&e.kat==="Bahan").map(e=>[e.date,e.time,e.name,e.qty||"",e.uom||"",e.amount,e.oleh])); }
   if(kind==="operasional"){ fname="4-Operasional"; rows=[["Tanggal","Jam","Nama","Total Harga","Oleh"]].concat(
